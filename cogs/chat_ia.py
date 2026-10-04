@@ -6,8 +6,8 @@ from personality import SYSTEM_PROMPT
 
 load_dotenv()
 
-API_KEY = os.getenv("GROQ_API_KEY")
-MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
 MAX_HISTORY = 10
 
 historial = {}
@@ -18,17 +18,14 @@ class ChatIA(commands.Cog):
         self.bot = bot
         self.client = None
 
-        if API_KEY:
+        if GROQ_API_KEY:
             try:
-                from openai import AsyncOpenAI
-                self.client = AsyncOpenAI(
-                    api_key=API_KEY,
-                    base_url="https://api.groq.com/openai/v1"
-                )
+                from groq import AsyncGroq
+                self.client = AsyncGroq(api_key=GROQ_API_KEY)
             except Exception as e:
-                print(f"No se pudo inicializar el cliente de IA: {e}")
+                print(f"No se pudo inicializar el cliente de Groq: {e}")
         else:
-            print("GROQ_API_KEY no configurada. El chat IA estara desactivado.")
+            print("GROQ_API_KEY no configurada. El chat de texto estara desactivado.")
 
     @commands.Cog.listener()
     async def on_message(self, message):
@@ -57,19 +54,21 @@ class ChatIA(commands.Cog):
         async with message.channel.typing():
             try:
                 respuesta = await self.client.chat.completions.create(
-                    model=MODEL,
+                    model=GROQ_MODEL,
                     messages=[{"role": "system", "content": SYSTEM_PROMPT}] + historial[user_id],
                     max_tokens=500,
                     temperature=0.7
                 )
                 texto = respuesta.choices[0].message.content
-                historial[user_id].append({"role": "assistant", "content": texto})
 
-                if len(texto) > 1900:
-                    for i in range(0, len(texto), 1900):
-                        await message.reply(texto[i:i + 1900])
-                else:
-                    await message.reply(texto)
+                if texto:
+                    historial[user_id].append({"role": "assistant", "content": texto})
+
+                    if len(texto) > 1900:
+                        for i in range(0, len(texto), 1900):
+                            await message.reply(texto[i:i + 1900])
+                    else:
+                        await message.reply(texto)
 
             except Exception as e:
                 print(f"Error IA: {e}")
